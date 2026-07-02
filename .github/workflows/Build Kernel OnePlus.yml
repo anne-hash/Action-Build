@@ -635,6 +635,32 @@ jobs:
           # 内核版本的数字转换，仅前两位不包含 SUBLEVEL
           echo "KERNEL_SHORT_PATCH_VERSION=$(echo $NEW_VERSION | cut -d. -f1,2 | tr '.' '_')" >> $GITHUB_ENV
 
+      - name: Fix OnePlus Android 15 fs-verity backport
+        run: |
+          cd kernel_workspace/kernel_platform
+          if [ "$KMI" != "android15-6.6" ] || [ "$KERNEL_REPOS" != "msm-kernel" ]; then
+            echo "fs-verity backport not needed for KMI=$KMI KERNEL_REPOS=$KERNEL_REPOS"
+            exit 0
+          fi
+          for f in \
+            fs/verity/fsverity_private.h \
+            fs/verity/hash_algs.c \
+            include/crypto/hash.h
+          do
+            if [ ! -f "./common/$f" ]; then
+              echo "Missing common backport source: ./common/$f" >&2
+              exit 1
+            fi
+            if [ ! -f "./$KERNEL_REPOS/$f" ]; then
+              echo "Missing target file: ./$KERNEL_REPOS/$f" >&2
+              exit 1
+            fi
+            cp "./common/$f" "./$KERNEL_REPOS/$f"
+          done
+          grep -q 'FS_VERITY_MAX_PENDING_DATA_BLOCKS' "./$KERNEL_REPOS/fs/verity/fsverity_private.h"
+          grep -q 'crypto_shash_finup_mb' "./$KERNEL_REPOS/include/crypto/hash.h"
+          grep -q 'mb_max_msgs' "./$KERNEL_REPOS/fs/verity/hash_algs.c"
+
       - name: Rust Version Handling
         run: |
           cd kernel_workspace/kernel_platform
