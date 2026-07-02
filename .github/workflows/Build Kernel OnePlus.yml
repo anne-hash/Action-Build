@@ -635,17 +635,20 @@ jobs:
           # 内核版本的数字转换，仅前两位不包含 SUBLEVEL
           echo "KERNEL_SHORT_PATCH_VERSION=$(echo $NEW_VERSION | cut -d. -f1,2 | tr '.' '_')" >> $GITHUB_ENV
 
-      - name: Fix OnePlus Android 15 fs-verity backport
+      - name: Fix OnePlus Android 15 msm-kernel backports
         run: |
           cd kernel_workspace/kernel_platform
           if [ "$KMI" != "android15-6.6" ] || [ "$KERNEL_REPOS" != "msm-kernel" ]; then
-            echo "fs-verity backport not needed for KMI=$KMI KERNEL_REPOS=$KERNEL_REPOS"
+            echo "msm-kernel backports not needed for KMI=$KMI KERNEL_REPOS=$KERNEL_REPOS"
             exit 0
           fi
           for f in \
             fs/verity/fsverity_private.h \
             fs/verity/hash_algs.c \
-            include/crypto/hash.h
+            include/crypto/hash.h \
+            fs/erofs/zdata.c \
+            drivers/md/dm-verity-fec.h \
+            include/trace/hooks/mmc.h
           do
             if [ ! -f "./common/$f" ]; then
               echo "Missing common backport source: ./common/$f" >&2
@@ -657,9 +660,20 @@ jobs:
             fi
             cp "./common/$f" "./$KERNEL_REPOS/$f"
           done
+
+          mmc_file="./$KERNEL_REPOS/drivers/mmc/core/mmc.c"
+          if [ ! -f "$mmc_file" ]; then
+            echo "Missing target file: $mmc_file" >&2
+            exit 1
+          fi
+          sed -i 's/const u32 __mask = (__size < 32 ? 1 << __size : 0) - 1;/const u32 __mask = (__size < 32 ? (1U << __size) - 1 : 0xffffffffU);/' "$mmc_file"
+
           grep -q 'FS_VERITY_MAX_PENDING_DATA_BLOCKS' "./$KERNEL_REPOS/fs/verity/fsverity_private.h"
           grep -q 'crypto_shash_finup_mb' "./$KERNEL_REPOS/include/crypto/hash.h"
           grep -q 'mb_max_msgs' "./$KERNEL_REPOS/fs/verity/hash_algs.c"
+          grep -q '\.gfp' "./$KERNEL_REPOS/fs/erofs/zdata.c"
+          grep -q 'const u8 \*want_digest' "./$KERNEL_REPOS/drivers/md/dm-verity-fec.h"
+          grep -q '0xffffffffU' "$mmc_file"
 
       - name: Rust Version Handling
         run: |
