@@ -646,6 +646,7 @@ jobs:
             fs/verity/fsverity_private.h \
             fs/verity/hash_algs.c \
             include/crypto/hash.h \
+            fs/erofs/compress.h \
             fs/erofs/zdata.c \
             drivers/md/dm-verity-fec.h \
             include/trace/hooks/mmc.h
@@ -671,6 +672,7 @@ jobs:
           grep -q 'FS_VERITY_MAX_PENDING_DATA_BLOCKS' "./$KERNEL_REPOS/fs/verity/fsverity_private.h"
           grep -q 'crypto_shash_finup_mb' "./$KERNEL_REPOS/include/crypto/hash.h"
           grep -q 'mb_max_msgs' "./$KERNEL_REPOS/fs/verity/hash_algs.c"
+          grep -q 'gfp_t gfp' "./$KERNEL_REPOS/fs/erofs/compress.h"
           grep -q '\.gfp' "./$KERNEL_REPOS/fs/erofs/zdata.c"
           grep -q 'const u8 \*want_digest' "./$KERNEL_REPOS/drivers/md/dm-verity-fec.h"
           grep -q '0xffffffffU' "$mmc_file"
