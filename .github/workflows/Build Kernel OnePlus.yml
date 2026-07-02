@@ -880,6 +880,29 @@ jobs:
           grep -nE '^(REPO_OWNER|REPO_NAME|REPO_BRANCH|KSU_VERSION_API|KSU_VERSION_FULL|VERSION_TAG|GIT_BIN|CURL_BIN)' kernel/Makefile
           echo "::endgroup::"
 
+      - name: Fix SukiSU sulog user_arg_ptr compatibility
+        if: ${{ github.event.inputs.KSU_META != 'N/A' }}
+        run: |
+          cd kernel_workspace/kernel_platform
+          sulog_file=""
+          for f in ./common/drivers/kernelsu/sulog/event.c ./KernelSU/kernel/sulog/event.c; do
+            if [ -f "$f" ]; then
+              sulog_file="$f"
+              break
+            fi
+          done
+          if [ -z "$sulog_file" ]; then
+            echo "SukiSU sulog event.c not found, skipping"
+            exit 0
+          fi
+          if grep -q 'const struct user_arg_ptr argv, gfp_t gfp' "$sulog_file" && \
+             grep -q '#define USER_ARG_NULL user_arg_null_ptr()' "$sulog_file"; then
+            perl -0pi -e 's/([ \t]*)#define USER_ARG_NULL user_arg_null_ptr\(\)/$1#ifdef CONFIG_KSU_SUSFS\n$1#define USER_ARG_NULL user_arg_null_ptr()\n$1#else\n$1#define USER_ARG_NULL ((struct user_arg_ptr){0})\n$1#endif/' "$sulog_file"
+          fi
+          if grep -q 'const struct user_arg_ptr argv, gfp_t gfp' "$sulog_file"; then
+            grep -q 'USER_ARG_NULL ((struct user_arg_ptr){0})' "$sulog_file"
+          fi
+
       - name: Apply Fake Patches
         if: ${{ github.event.inputs.SUSFS_META != '-1' }}
         run: |
