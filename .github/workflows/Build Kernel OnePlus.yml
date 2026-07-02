@@ -800,6 +800,7 @@ jobs:
           echo "manager_artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
 
       - name: Add SukiSU Ultra
+        if: ${{ github.event.inputs.KSU_META != 'N/A' }}
         run: |
           cd kernel_workspace/kernel_platform
           MANAGER_BRANCH="${{ steps.manager.outputs.manager_branch }}"
@@ -954,6 +955,7 @@ jobs:
           fi
 
       - name: Apply Patches SukiSU Ultra
+        if: ${{ github.event.inputs.KSU_META != 'N/A' }}
         env:
           FILE: ${{ github.event.inputs.FILE }}
         run: |
@@ -1278,19 +1280,25 @@ jobs:
             fi
           }
 
-          # SukiSU Ultra配置
-          set_config "CONFIG_KSU=y"
-
-          # KPM配置
-          if [ "${{ github.event.inputs.KPM }}" = "KPM" ] || [ "${{ github.event.inputs.KPM }}" = "N/A" ]; then
-            set_config "CONFIG_KPM=y"
-          fi
-          if [ "${{ github.event.inputs.KPM }}" = "KPN" ]; then
+          if [ "${{ github.event.inputs.KSU_META }}" = "N/A" ]; then
+            set_config "CONFIG_KSU=n"
             set_config "CONFIG_KPM=n"
+            set_config "CONFIG_KSU_SUSFS=n"
+          else
+            # SukiSU Ultra配置
+            set_config "CONFIG_KSU=y"
+
+            # KPM配置
+            if [ "${{ github.event.inputs.KPM }}" = "KPM" ]; then
+              set_config "CONFIG_KPM=y"
+            fi
+            if [ "${{ github.event.inputs.KPM }}" = "KPN" ] || [ "${{ github.event.inputs.KPM }}" = "N/A" ]; then
+              set_config "CONFIG_KPM=n"
+            fi
           fi
 
           # SUSFS配置
-          if [ "${{ github.event.inputs.SUSFS_META }}" != "-1" ]; then
+          if [ "${{ github.event.inputs.KSU_META }}" != "N/A" ] && [ "${{ github.event.inputs.SUSFS_META }}" != "-1" ]; then
             set_config "CONFIG_KSU_SUSFS=y"
             set_config "CONFIG_KSU_SUSFS_SUS_PATH=y"
             set_config "CONFIG_KSU_SUSFS_SUS_MAP=y"
@@ -1726,6 +1734,7 @@ jobs:
           cp ksu_module_susfs_1.5.2+_Release.zip ./AnyKernel3/
 
       - name: Download Latest SukiSU-Ultra APK from CI
+        if: ${{ github.event.inputs.KSU_META != 'N/A' }}
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1757,10 +1766,19 @@ jobs:
         run: |
           echo "value=${{ env.ZRAM_ALGO_U && format('_{0}', env.ZRAM_ALGO_U) || '' }}${{ github.event.inputs.KPM == 'KPM' && '_KPM' || github.event.inputs.KPM == 'KPN' && '_KPN' || '' }}${{ github.event.inputs.LSM_BBG == 'true' && '_BBG' || '' }}_ILH${{ github.event.inputs.SCHED_HMBIRD== 'true' && '_HMBIRD' || '' }}${{ github.event.inputs.DROID_SPACES== 'true' && '_DS' || '' }}${{ github.event.inputs.RE_KERNEL == 'true' && '_REKER' || '' }}${{ github.event.inputs.LZ4_UPDATE == 'true' && '_LZ4UPD' || '' }}" >> $GITHUB_OUTPUT
 
+      - name: Set artifact name
+        id: artifact_name
+        run: |
+          if [ "${{ github.event.inputs.KSU_META }}" = "N/A" ]; then
+            echo "value=OfficialKernel_${{ steps.extract_info.outputs.value }}(${{ env.CKERNEL_VERSION }})${{ steps.suffix.outputs.value }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=AnyKernel3_SukiSUUltra_${{ env.KSUVER }}_${{ steps.extract_info.outputs.value }}(${{ env.CKERNEL_VERSION }})${{ steps.suffix.outputs.value }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload AnyKernel3
         uses: actions/upload-artifact@v7
         with:
-          name: AnyKernel3_SukiSUUltra_${{ env.KSUVER }}_${{ steps.extract_info.outputs.value }}(${{ env.CKERNEL_VERSION }})${{ steps.suffix.outputs.value }}
+          name: ${{ steps.artifact_name.outputs.value }}
           path: ./AnyKernel3/*
 
       - name: Extract and Process ZRAM Module
